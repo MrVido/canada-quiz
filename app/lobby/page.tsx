@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { PuzzleBackground } from "@/components/PuzzleBackground";
 import { useAudioUnlock } from "@/hooks/useAudioUnlock";
 import { useGameSync } from "@/hooks/useGameSync";
-import { joinRoom, startGame } from "@/lib/game-api";
+import { joinRoom, resetGame, startGame } from "@/lib/game-api";
 import { ROOM_CODE } from "@/lib/constants";
 import { getClientId } from "@/lib/session";
 
@@ -29,14 +29,12 @@ export default function LobbyPage() {
     if (room?.status === "playing") {
       router.push("/game");
     }
-    if (room?.status === "finished") {
-      router.push("/game");
-    }
   }, [room?.status, router]);
 
   const me = players.find((p) => p.client_id === clientId);
   const isHost = me?.is_host ?? false;
   const joined = Boolean(me);
+  const isFinished = room?.status === "finished";
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +56,18 @@ export default function LobbyPage() {
       await joinRoom(clientId, trimmed);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Failed to join");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReset = async () => {
+    unlockAudio();
+    setSubmitting(true);
+    try {
+      await resetGame(clientId);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Failed to reset");
     } finally {
       setSubmitting(false);
     }
@@ -99,6 +109,12 @@ export default function LobbyPage() {
           {(error || localError) && (
             <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-red-700">
               {error || localError}
+            </p>
+          )}
+
+          {isFinished && (
+            <p className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-center text-sm text-green-800">
+              The last round is done! Host can start a new game, eh.
             </p>
           )}
 
@@ -159,7 +175,7 @@ export default function LobbyPage() {
             )}
           </div>
 
-          {joined && isHost && players.length > 0 && (
+          {joined && isHost && players.length > 0 && !isFinished && (
             <button
               type="button"
               onClick={handleStart}
@@ -170,9 +186,26 @@ export default function LobbyPage() {
             </button>
           )}
 
-          {joined && !isHost && (
+          {joined && isHost && isFinished && (
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={submitting}
+              className="mt-8 w-full rounded-xl bg-red-600 py-4 text-lg font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+            >
+              {submitting ? "Resetting..." : "Play Again! 🇨🇦"}
+            </button>
+          )}
+
+          {joined && !isHost && !isFinished && (
             <p className="mt-8 text-center text-sm text-gray-500">
               Waiting for the host to start the quiz...
+            </p>
+          )}
+
+          {joined && !isHost && isFinished && (
+            <p className="mt-8 text-center text-sm text-gray-500">
+              Waiting for the host to start a new round...
             </p>
           )}
         </div>

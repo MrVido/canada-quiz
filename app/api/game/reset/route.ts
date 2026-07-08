@@ -18,14 +18,14 @@ export async function POST(request: Request) {
     `) as { is_host: boolean }[];
 
     if (!host[0]?.is_host) {
-      return NextResponse.json({ error: "Only the host can start" }, { status: 403 });
+      return NextResponse.json({ error: "Only the host can reset" }, { status: 403 });
     }
 
     await sql`
       UPDATE rooms SET
-        status = 'playing',
+        status = 'lobby',
         current_question = 0,
-        question_started_at = now(),
+        question_started_at = NULL,
         updated_at = now()
       WHERE code = ${ROOM_CODE}
     `;
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("POST /api/game/start", error);
+    console.error("POST /api/game/reset", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Server error" },
       { status: 500 },

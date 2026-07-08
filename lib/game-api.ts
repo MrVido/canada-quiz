@@ -37,6 +37,13 @@ export async function startGame(clientId: string): Promise<void> {
   });
 }
 
+export async function resetGame(clientId: string): Promise<void> {
+  await api("/api/game/reset", {
+    method: "POST",
+    body: JSON.stringify({ clientId }),
+  });
+}
+
 export async function submitAnswer(
   clientId: string,
   questionIndex: number,

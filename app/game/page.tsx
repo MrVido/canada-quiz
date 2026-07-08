@@ -10,6 +10,7 @@ import { useGameSync } from "@/hooks/useGameSync";
 import {
   advanceQuestion,
   allPlayersAnswered,
+  resetGame,
   submitAnswer,
 } from "@/lib/game-api";
 import { QUESTION_TIME_MS, ROOM_CODE, TOTAL_QUESTIONS } from "@/lib/constants";
@@ -29,6 +30,7 @@ export default function GamePage() {
   const [feedbackCorrect, setFeedbackCorrect] = useState(false);
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_MS);
   const [submitting, setSubmitting] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const advancingRef = useRef(false);
   const lastQuestionRef = useRef(-1);
 
@@ -202,6 +204,20 @@ export default function GamePage() {
     }
   }
 
+  const handlePlayAgain = async () => {
+    if (!me?.is_host) {
+      return;
+    }
+    unlockAudio();
+    setResetting(true);
+    try {
+      await resetGame(clientId);
+      router.replace("/lobby");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   if (loading || !room) {
     return (
       <main className="flex min-h-screen items-center justify-center">
@@ -219,8 +235,23 @@ export default function GamePage() {
       <PuzzleBackground revealedPieces={revealedPieces} />
 
       {isFinished ? (
-        <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
+        <main className="relative z-10 flex min-h-screen flex-col items-center justify-center gap-6 p-6">
           <Leaderboard players={players} highlightClientId={clientId} />
+          {me?.is_host && (
+            <button
+              type="button"
+              onClick={handlePlayAgain}
+              disabled={resetting}
+              className="w-full max-w-md rounded-xl bg-red-600 px-8 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-red-700 disabled:opacity-50"
+            >
+              {resetting ? "Resetting..." : "Play Again! 🇨🇦"}
+            </button>
+          )}
+          {!me?.is_host && (
+            <p className="text-center text-sm text-white drop-shadow">
+              Waiting for the host to start a new round...
+            </p>
+          )}
           <EndScreen onUnlockAudio={unlockAudio} />
         </main>
       ) : (
