@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Great Canadian Chaos Quiz 🇨🇦
 
-## Getting Started
+A fun, mobile-first multiplayer Canada quiz party game. One room, one code, maximum chaos.
 
-First, run the development server:
+**Room code:** `1234567`
+
+## Stack
+
+- Next.js (App Router)
+- Tailwind CSS
+- Neon PostgreSQL (via Vercel/Neon integration)
+- API polling for multiplayer sync (simple & reliable)
+
+## Quick start
+
+### 1. Database setup
+
+1. Create a [Neon](https://neon.tech) project (or use Vercel Postgres / Neon integration)
+2. Copy your `DATABASE_URL` connection string
+3. Run the migration:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
+# Add DATABASE_URL to .env.local
+node --env-file=.env.local scripts/migrate.mjs
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Media assets
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Assets live in `/public` (copied from `/data`):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| File | Purpose |
+|------|---------|
+| `video.mp4` | End-screen celebration video (loops fullscreen) |
+| `ohcanada.mp3` | National anthem (plays once, full song) |
+| `canada-puzzle-bg.jpg` | Puzzle reveal background (citizenship photo) |
 
-## Learn More
+### 3. Run locally
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:3000](http://localhost:3000), enter room code `1234567`, pick a nickname, and play.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy to Vercel
 
-## Deploy on Vercel
+```bash
+npx vercel --prod
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Add environment variable in Vercel dashboard:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `DATABASE_URL` — your Neon connection string
+
+## How it works
+
+1. **Landing** — Enter room code `1234567`
+2. **Lobby** — Pick a nickname; first player is host; host starts the game
+3. **Quiz** — 20 multiple-choice questions, synced via API polling
+4. **Puzzle background** — Citizenship photo revealed piece-by-piece (5×4 grid, one piece per question)
+5. **End screen** — Leaderboard → full photo reveal → looping video + O Canada (with fallback button)
+
+## Reset between events
+
+```sql
+UPDATE rooms SET status = 'lobby', current_question = 0, question_started_at = NULL WHERE code = '1234567';
+DELETE FROM players WHERE room_code = '1234567';
+```
+
+## Delete after the event
+
+```bash
+rm -rf canada-quiz
+# Delete Vercel project + Neon database from their dashboards
+```
