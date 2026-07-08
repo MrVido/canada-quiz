@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isAudioUnlocked } from "@/lib/session";
 
 type EndScreenProps = {
@@ -13,7 +14,7 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [phase, setPhase] = useState<Phase>("leaderboard");
-  const [audioBlocked, setAudioBlocked] = useState(false);
+  const [audioPlayFailed, setAudioPlayFailed] = useState(false);
 
   useEffect(() => {
     const leaderboardTimer = setTimeout(() => setPhase("reveal"), 8000);
@@ -29,7 +30,7 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
     return () => clearTimeout(revealTimer);
   }, [phase]);
 
-  const startCelebration = () => {
+  const startCelebration = useCallback(() => {
     const video = videoRef.current;
     const audio = audioRef.current;
 
@@ -40,9 +41,9 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
 
     if (audio) {
       audio.currentTime = 0;
-      audio.play().catch(() => setAudioBlocked(true));
+      audio.play().catch(() => setAudioPlayFailed(true));
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (phase !== "celebration") {
@@ -51,21 +52,23 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
 
     if (isAudioUnlocked()) {
       startCelebration();
-    } else {
-      setAudioBlocked(true);
-      const video = videoRef.current;
-      if (video) {
-        video.play().catch(() => {});
-      }
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+
+    const video = videoRef.current;
+    if (video) {
+      video.play().catch(() => {});
+    }
+  }, [phase, startCelebration]);
 
   const playAnthem = () => {
     onUnlockAudio();
-    setAudioBlocked(false);
+    setAudioPlayFailed(false);
     startCelebration();
   };
+
+  const showAnthemButton =
+    phase === "celebration" && (!isAudioUnlocked() || audioPlayFailed);
 
   if (phase === "leaderboard") {
     return null;
@@ -74,10 +77,12 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
   if (phase === "reveal") {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
-        <img
+        <Image
           src="/canada-puzzle-bg.jpg"
           alt="Citizenship celebration"
-          className="h-full w-full object-cover opacity-0 animate-[fadeIn_1s_ease-in_forwards]"
+          fill
+          priority
+          className="object-cover opacity-0 animate-[fadeIn_1s_ease-in_forwards]"
         />
         <p className="absolute bottom-10 text-center text-lg font-bold text-white drop-shadow-lg">
           🇨🇦 Congratulations, eh! 🇨🇦
@@ -99,7 +104,7 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
       />
       <audio ref={audioRef} src="/ohcanada.mp3" preload="auto" />
 
-      {audioBlocked && (
+      {showAnthemButton && (
         <button
           type="button"
           onClick={playAnthem}

@@ -67,6 +67,58 @@ export default function GamePage() {
     }
   }, [questionIndex]);
 
+  const tryAdvance = useCallback(async () => {
+    if (!room || advancingRef.current || room.status !== "playing") {
+      return;
+    }
+    if (!allPlayersAnswered(players, questionIndex)) {
+      return;
+    }
+    if (!me?.is_host) {
+      return;
+    }
+
+    advancingRef.current = true;
+    try {
+      await advanceQuestion(clientId, questionIndex);
+    } finally {
+      advancingRef.current = false;
+    }
+  }, [room, players, questionIndex, me?.is_host, clientId]);
+
+  const handleTimeout = useCallback(async () => {
+    if (!me || !room || !question || hasAnswered || submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+    setSelectedChoice(-1);
+    setFeedbackCorrect(false);
+    setShowFeedback(true);
+
+    try {
+      const startedAt =
+        room.question_started_at ?? new Date().toISOString();
+      await submitAnswer(
+        clientId,
+        questionIndex,
+        -1,
+        startedAt,
+        question.answerIndex,
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    me,
+    room,
+    question,
+    hasAnswered,
+    submitting,
+    clientId,
+    questionIndex,
+  ]);
+
   useEffect(() => {
     if (
       !room ||
@@ -90,27 +142,18 @@ export default function GamePage() {
 
     tick();
     const interval = setInterval(tick, 200);
-    return () => clearInterval(interval);
-  }, [room, question, hasAnswered, showFeedback]);
 
-  const tryAdvance = useCallback(async () => {
-    if (!room || advancingRef.current || room.status !== "playing") {
-      return;
-    }
-    if (!allPlayersAnswered(players, questionIndex)) {
-      return;
-    }
-    if (!me?.is_host) {
-      return;
-    }
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(0, QUESTION_TIME_MS - elapsed);
+    const timeoutId = setTimeout(() => {
+      void handleTimeout();
+    }, remaining);
 
-    advancingRef.current = true;
-    try {
-      await advanceQuestion(clientId, questionIndex);
-    } finally {
-      advancingRef.current = false;
-    }
-  }, [room, players, questionIndex, me?.is_host, clientId]);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeoutId);
+    };
+  }, [room, question, hasAnswered, showFeedback, handleTimeout, questionIndex]);
 
   useEffect(() => {
     if (!showFeedback || !hasAnswered) {
@@ -118,26 +161,11 @@ export default function GamePage() {
     }
 
     const timer = setTimeout(() => {
-      tryAdvance();
+      void tryAdvance();
     }, 2500);
 
     return () => clearTimeout(timer);
   }, [showFeedback, hasAnswered, tryAdvance]);
-
-  useEffect(() => {
-    if (
-      !room ||
-      room.status !== "playing" ||
-      hasAnswered ||
-      timeLeft > 0 ||
-      !me
-    ) {
-      return;
-    }
-
-    handleTimeout();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, hasAnswered, room?.status]);
 
   async function handleAnswer(choiceIndex: number) {
     if (
@@ -169,25 +197,6 @@ export default function GamePage() {
         startedAt,
         question.answerIndex,
       );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleTimeout() {
-    if (!me || !room || !question || hasAnswered || submitting) {
-      return;
-    }
-
-    setSubmitting(true);
-    setSelectedChoice(-1);
-    setFeedbackCorrect(false);
-    setShowFeedback(true);
-
-    try {
-      const startedAt =
-        room.question_started_at ?? new Date().toISOString();
-      await submitAnswer(clientId, questionIndex, -1, startedAt, question.answerIndex);
     } finally {
       setSubmitting(false);
     }

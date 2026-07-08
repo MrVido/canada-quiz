@@ -14,7 +14,6 @@ export default function LobbyPage() {
   const unlockAudio = useAudioUnlock();
   const { room, players, loading, error } = useGameSync();
   const [nickname, setNickname] = useState("");
-  const [joined, setJoined] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState("");
   const clientId = getClientId();
@@ -37,13 +36,7 @@ export default function LobbyPage() {
 
   const me = players.find((p) => p.client_id === clientId);
   const isHost = me?.is_host ?? false;
-
-  useEffect(() => {
-    if (me) {
-      setJoined(true);
-      setNickname(me.nickname);
-    }
-  }, [me]);
+  const joined = Boolean(me);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +56,6 @@ export default function LobbyPage() {
     setSubmitting(true);
     try {
       await joinRoom(clientId, trimmed);
-      setJoined(true);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Failed to join");
     } finally {

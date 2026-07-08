@@ -1,4 +1,3 @@
-import { ROOM_CODE } from "./constants";
 import type { Player, Room } from "./types";
 
 async function api<T>(url: string, options?: RequestInit): Promise<T> {
