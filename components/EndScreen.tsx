@@ -1,34 +1,34 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Leaderboard } from "@/components/Leaderboard";
 import { isAudioUnlocked } from "@/lib/session";
+import type { Player } from "@/lib/types";
 
 type EndScreenProps = {
   onUnlockAudio: () => void;
+  players: Player[];
+  highlightClientId: string;
+  isHost: boolean;
+  onPlayAgain: () => void;
+  resetting: boolean;
 };
 
-type Phase = "leaderboard" | "reveal" | "celebration";
+const LEADERBOARD_OVERLAY_MS = 3500;
 
-export function EndScreen({ onUnlockAudio }: EndScreenProps) {
+export function EndScreen({
+  onUnlockAudio,
+  players,
+  highlightClientId,
+  isHost,
+  onPlayAgain,
+  resetting,
+}: EndScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [phase, setPhase] = useState<Phase>("leaderboard");
   const [audioPlayFailed, setAudioPlayFailed] = useState(false);
-
-  useEffect(() => {
-    const leaderboardTimer = setTimeout(() => setPhase("reveal"), 8000);
-    return () => clearTimeout(leaderboardTimer);
-  }, []);
-
-  useEffect(() => {
-    if (phase !== "reveal") {
-      return;
-    }
-
-    const revealTimer = setTimeout(() => setPhase("celebration"), 3000);
-    return () => clearTimeout(revealTimer);
-  }, [phase]);
+  const [showOverlay, setShowOverlay] = useState(true);
+  const needsAnthemButton = !isAudioUnlocked() || audioPlayFailed;
 
   const startCelebration = useCallback(() => {
     const video = videoRef.current;
@@ -46,10 +46,6 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
   }, []);
 
   useEffect(() => {
-    if (phase !== "celebration") {
-      return;
-    }
-
     if (isAudioUnlocked()) {
       startCelebration();
       return;
@@ -59,37 +55,18 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
     if (video) {
       video.play().catch(() => {});
     }
-  }, [phase, startCelebration]);
+  }, [startCelebration]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowOverlay(false), LEADERBOARD_OVERLAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   const playAnthem = () => {
     onUnlockAudio();
     setAudioPlayFailed(false);
     startCelebration();
   };
-
-  const showAnthemButton =
-    phase === "celebration" && (!isAudioUnlocked() || audioPlayFailed);
-
-  if (phase === "leaderboard") {
-    return null;
-  }
-
-  if (phase === "reveal") {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
-        <Image
-          src="/canada-puzzle-bg.jpg"
-          alt="Citizenship celebration"
-          fill
-          priority
-          className="object-cover opacity-0 animate-[fadeIn_1s_ease-in_forwards]"
-        />
-        <p className="absolute bottom-10 text-center text-lg font-bold text-white drop-shadow-lg">
-          🇨🇦 Congratulations, eh! 🇨🇦
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
@@ -104,7 +81,39 @@ export function EndScreen({ onUnlockAudio }: EndScreenProps) {
       />
       <audio ref={audioRef} src="/ohcanada.mp3" preload="auto" />
 
-      {showAnthemButton && (
+      {showOverlay && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/50 p-6 transition-opacity duration-500">
+          <Leaderboard players={players} highlightClientId={highlightClientId} />
+          {isHost && (
+            <button
+              type="button"
+              onClick={onPlayAgain}
+              disabled={resetting}
+              className="w-full max-w-md rounded-xl bg-red-600 px-8 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-red-700 disabled:opacity-50"
+            >
+              {resetting ? "Resetting..." : "Play Again! 🇨🇦"}
+            </button>
+          )}
+          {!isHost && (
+            <p className="text-center text-sm text-white drop-shadow">
+              Waiting for the host to start a new round...
+            </p>
+          )}
+        </div>
+      )}
+
+      {!showOverlay && isHost && (
+        <button
+          type="button"
+          onClick={onPlayAgain}
+          disabled={resetting}
+          className="absolute top-4 right-4 z-10 rounded-full bg-red-600/90 px-5 py-2 text-sm font-bold text-white shadow-lg backdrop-blur transition hover:bg-red-700 disabled:opacity-50"
+        >
+          {resetting ? "Resetting..." : "Play Again 🇨🇦"}
+        </button>
+      )}
+
+      {needsAnthemButton && (
         <button
           type="button"
           onClick={playAnthem}
